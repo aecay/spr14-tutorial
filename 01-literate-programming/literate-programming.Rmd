@@ -318,6 +318,19 @@ fiddling.
 are (not exactly complete) details on what is needed to make the
 approach work properly.
 
+### Slides
+
+It's possible to make slides with knitr.  See the
+`literate-slides.Rpres` file in this repo and the [advice from
+RStudio](http://www.rstudio.com/ide/docs/presentations/overview).
+
 ## Concluding thoughts
 
+There are [a zillion (well, 109 as of this writing) knitr
+examples](https://github.com/yihui/knitr-examples) on the web.  They are
+targeted at both LaTeX and Markdown uses.
 
+There is another well-known literate programming environment for Python
+called [IPython notebook](http://ipython.org/notebook).  If your code is
+Python instead of R, you can use that technology.  Maybe we will meet it
+in the study group some day.
