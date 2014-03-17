@@ -313,6 +313,21 @@ xtable(table(data3$a, data3$b))
 Each of these packages has many options to control the output, which you
 can read about.  And each works with LaTeX as well as HTML/Markdown.
 
+### Interactive charts
+
+We can use the [`rCharts` library](http://ramnathv.github.io/rCharts/)
+to create interactive charts:
+
+```{r results='asis'}
+library(rCharts)
+names(iris) = gsub("\\.", "", names(iris))
+p <- rPlot(SepalLength ~ SepalWidth | Species, data = iris, color = 'Species', type = 'point')
+p$print("chart", include_assets = TRUE, cdn = TRUE)
+```
+
+Mouse over the points to see tooltips (a [favorite subject of
+mine](http://aaronecay.com/blog/2014/02/tooltips-in-ggplot/)).
+
 ### Animation
 
 We can make animated figures too, although they are a bit clunky by
