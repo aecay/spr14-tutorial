@@ -1,0 +1,323 @@
+# Literate Programming with R Markdown
+
+## Preliminaries
+
+### What is literate programming?
+
+[Literate programming](https://en.wikipedia.org/wiki/Literate_programming) is a
+way of writing code and natural language prose.  It mixes the source code of
+a computer program with an explanation of what the program is doing and the
+results of running the program.
+
+The principal advantages of this coding style are:
+- it allows documentation/explanation of code to intermingle with the code itself,
+  in a more fluid and accessible (to non-programmers) way than source code
+  comments.
+- it helps prevent the description of a code process and the code itself from
+  diverging
+- it allows a single document to contain the entirety of an analysis that is
+  based partially in code and partially in prose
+
+"Source code" sounds rather grand, but in linguistics this could be just the
+extraction of counts from a corpus, or the generation of a graph.  You won't
+have to worry about keeping track of your code separately from the documents
+(slide decks, handouts, articles, ...) that reference it.
+
+### Getting started
+
+You should download the (free, open source) [RStudio](https://www.rstudio.com/)
+IDE.  This provides a simple environment to work with R and R Markdown.
+
+We'll be using the [knitr](http://yihui.name/knitr/) package to convert
+Markdown documents to HTML.  (Not that you need to know that; most of the
+details are silently handled by RStudio.)
+
+Once you have installed and opened RStudio, go to the "File > New File > R
+Markdown" menu item to get started (or open this file in RStudio's editor).
+
+### What is Markdown?
+
+A simple language that translates to HTML.  RStudio explains it better than I
+could...open the program and browse the "Markdown Quick Reference" under the
+"Help" menu.
+
+Why Markdown and not LaTeX?  Markdown/HTML is a more
+versatile format than PDF (more easily viewed on small devices, more easily
+published on the web, less complicated to compile).  HTML also allows more
+interactive features, some of which we will see in this document.
+
+RStudio does supports R/LaTeX literate programming, via either Sweave or knitr
+-- the latter is superior, but must be enabled in RStudio's preferences.
+
+### Viewing your document
+
+When you are ready to see the output, click the "Knit HTML" button in
+the toolbar above RStudio's R markdown editor.  This will transform your
+document to HTML and pop up a window to show you the output.
+
+## Using R Markdown
+
+### Code and results
+
+The simplest way to use R Markdown is to embed *code chunks* in your
+document.  These are delimited by three backtick characters (located
+above the tab key on US keyboards).  By default, a code chunk prints its
+source and output in the resulting document:
+
+```{r}
+12 * 12
+```
+
+The result is exactly what you would see in the R console when running
+these commands, prefixed by `##` to turn it into an R comment.  (This
+allows you to copy and paste the code and results into an R session
+without the results confusing R.)
+
+We might want to include some code without running it (for example to
+discuss some incorrect algorithm that we will not use).  In that case,
+we add a *chunk option* to the code chunk, telling knitr not to evaluate
+that chunk.  In this case, we want `eval=FALSE`.  Thus we might say:
+dividing by zero is a bad idea:
+
+```{r eval=FALSE}
+12 / 0
+```
+
+Notice we don't see the result of this code (which would be `Inf`) in
+the output.  We can also ask to see only the result, and not the code:
+the answer to life, the universe, and everything is:
+
+```{r echo=FALSE}
+6 * 7
+```
+
+### Running code in an R session
+
+RStudio compiles your document in a separate R process.  This means that
+you cannot see the variables that your code creates.  If you want to run
+the code in your current R session, use the "Chunks" menu above the R
+Markdown editor on the right to run a single chunk, or all chinks in the
+document.
+
+### Graphics
+
+Graphical inclusion in your document should, in the simple case, just work:
+
+```{r}
+df <- data.frame(x = rnorm(10), y = rnorm(10))
+library(ggplot2)
+ggplot(aes(x = x, y = y), data = df) + geom_point()
+```
+
+If you want to control the width and height of the plot, you can use the
+`fig.width` and `fig.height` options.  Let's make the same plot smaller
+(notice we don't have to re-import the `ggplot2` library or define the
+`df` variable...the code chunks are run sequentially, so those things
+are already taken care of by the previous chunk):
+
+```{r fig.width=4, fig.height=4}
+ggplot(aes(x = x, y = y), data = df) + geom_point()
+```
+
+### Named code chunks
+
+You can give code chunks a name:
+
+```{r foo}
+x <- 2
+```
+
+(This seems like useless trivia, but will become important in the
+discussion of caching below)
+
+### Caching
+
+RStudio by default re-runs each code chunk every time it compiles your
+document.  This can quickly make compilation a long process.  Luckily,
+there is a caching option, which will save the result of a chunk for
+future compilation, eliminating the need to re-run the code.  By way of
+example, here is a code chunk which prints a random number.  It should
+change on each recompilation of the document:
+
+```{r}
+rnorm(1)
+```
+
+On the other hand, this cached chunk will calculate a random number the
+first time it is run, then continue to print the same random number on
+each compilation.
+
+```{r random-cache, cache=TRUE}
+rnorm(1)
+```
+
+Knitr uses a very simple algorithm to determine if a code chunk needs to
+be re-run: it looks at the source code of that chunk.  So it is not
+smart enough to know that random number generation will give a different
+result each time.  On the other hand, if we add a space at the beginning
+of a line in a cached chunk, it will be re-run even though the meaning
+of the code has not changed at all.
+
+**Caching can be powerful, but also dangerous!** It's easy to be tricked
+into thinking that we are getting new randomness each run, when in
+fact we are not because of the cache
+
+#### Caching all code chunks
+
+Because the cache is often a useful time-saver, we might want to cache
+all code chunks in a document.  We can do this by putting a code chunk
+like this one at the beginning of the document:
+
+```{r eval=FALSE}
+opts_chunk$set(cache = TRUE)
+```
+
+We can also set other default options this way (perhaps we want to make
+`fig.width` and `fig.height` 5 inches, rather than the default 7).
+These options can be overridden at the individual chunk level.
+
+#### Cache dependencies
+
+As our document gets more complicated, we might want to have
+dependencies on multiple code chunks.  A common motivation for this is
+to separate data input/cleaning from plotting and modeling.  Here's a
+sort of contrived example:
+
+```{r read-data, cache=TRUE}
+## Instead of random numbers, imagine that this code reads data
+## from an external file, a sometimes-time-consuming process.
+data <- data.frame(x = rnorm(10))
+data$y <- x + rnorm(10, 0, 0.1)
+```
+
+```{r make-plot, cache=TRUE, dependson="read-data"}
+## Similarly, imagine that this plot and the following model
+## take a long time to produce
+ggplot(aes(x = x, y = y), data = data) + geom_point()
+```
+
+```{r make-model, cache=TRUE, dependson="read-data"}
+lm(y ~ x, data = data)
+```
+
+If we change one of the plot or model code chunks, only that chunk will
+be re-run.  On the other hand, if we change the chunk which reads the
+data, the data will be re-read and the plot and model re-generated based
+on the new data.  This is because we have told knitr that the plot and
+model depend on the data reading.  (Read the source code of this
+document to see how this is done.)  This uses the code chunk names
+discussed above.  We can make a code chunk depend on multiple ancestor
+chunks, using the `c` function in R: `dependson=c("chunk-one",
+"chunk-2")`.
+
+## More advanced features
+
+### Math
+
+R Markdown can display mathematical formulas using a LaTeX-like syntax.
+Here's the quadratic formula:
+
+$$x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
+
+For shorter formulas, using single dollar signs gives a more compact
+rendering suitable for embedding in a paragraph.  Here's a compact
+version of the quadratic formula: $x = \frac{-b \pm
+\sqrt{b^2-4ac}}{2a}$.  Here's some more text to make this more like a
+paragraph.  Etc., etc., you get the picture.
+
+The underlying technology is called [Mathjax](http://www.mathjax.org/);
+you can read documentation and examples at its website.
+
+### Tables
+
+Knitr includes a very simple HTML table generator.  Here it is in
+action, using a very famous data set about irises (included with R and
+thus used in many examples):
+
+```{r results='asis'}
+data(iris)
+kable(head(iris))
+```
+
+Note (in this document's source) that we've used the chunk option
+`results='asis'` to tell knitr to insert the result as raw HTML into the
+document, rather then treating it as simple text.
+
+This facility can form the basis of sophisticated functionality with
+added Javascript code.  Try `vignette("datatables")` (with the `knitr`
+library loaded in your R session) to see an example of this data set in
+a sortable, searchable table.
+
+There are also packages that allow the printing of models, data frame
+summaries, etc. as HTML.  These include the packages
+[`xtable`](http://cran.r-project.org/web/packages/xtable/),
+[`stargazer`](http://cran.r-project.org/web/packages/stargazer/), and
+[`texreg`](http://cran.r-project.org/web/packages/texreg/vignettes/v55i08.pdf).
+Each one is sadly a bit different; you'll have to pick the one that most
+closely matches your needs/preferences.  Generally speaking, `xtable` is
+a more "general-purpose" converter of two-dimensional table-ish things
+to HTML, whereas the other two specialize in regression models and try
+to add useful things to them (for example AIC, BIC, $R^2$, ...).
+
+[Here](http://conjugateprior.org/2013/03/r-to-latex-packages-coverage/)
+is a website that compares the coverage of these packages on various
+types of models.
+
+Here are a couple of examples.  First we load the packages and create
+some fake data:
+
+```{r results='asis'}
+suppressMessages(library(stargazer))
+library(xtable)
+options(xtable.type="html", xtable.html.table.attributes="")
+data2 <- data.frame(x = rnorm(100), x2 = rnorm(100, 1, 0.1))
+data2$y <- with(data2, x + 2 * x2 + rnorm(100, 0, 0.1))
+```
+
+The `stargazer` package is very fancy:
+
+```{r results='asis'}
+stargazer(lm(y ~ x + x2, data = data2), type = "html")
+```
+
+Whereas the `xtable` package gives us output very similar to what we see in the
+R console:
+
+```{r results='asis'}
+xtable(lm(y ~ x + x2, data = data2))
+```
+
+Here's an example of a cross-tabulation:
+
+```{r results='asis'}
+data3 <- data.frame(a = sample(LETTERS[1:4], 100, replace = TRUE),
+                    b = sample(LETTERS[1:4], 100, replace = TRUE))
+xtable(table(data3$a, data3$b))
+```
+
+Each of these packages has many options to control the output, which you
+can read about.  And each works with LaTeX as well as HTML/Markdown.
+
+### Animation
+
+We can make animated figures too, although they are a bit clunky by
+default.  (For example, they will not show up properly in the RStudio
+previewer, but rather have to be viewed in a real browser such as Chrome
+or Firefox.)
+
+```{r fig.show="animate"}
+print(ggplot(aes(x = x, y = y), data = df) + geom_point(color = "red"))
+print(ggplot(aes(x = x, y = y), data = df) + geom_point(color = "green"))
+print(ggplot(aes(x = x, y = y), data = df) + geom_point(color = "blue"))
+```
+
+It's possible to get nicer animations, like the one on [this
+page](http://taiyun.github.io/blog/2012/07/k-means/), but it takes some
+fiddling.
+[Here](https://github.com/yihui/knitr-examples/blob/master/108-animation-scianimator.Rmd)
+are (not exactly complete) details on what is needed to make the
+approach work properly.
+
+## Concluding thoughts
+
+
