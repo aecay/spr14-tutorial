@@ -66,6 +66,7 @@ source and output in the resulting document:
 
 ```{r}
 12 * 12
+6 * 6
 ```
 
 The result is exactly what you would see in the R console when running
@@ -90,6 +91,16 @@ the answer to life, the universe, and everything is:
 ```{r echo=FALSE}
 6 * 7
 ```
+
+### Inline code
+
+It is also possible to put code inline.  This is useful for example to
+specify data set sizes in a paragraph.  Ideally there will be no numbers
+directly written in the text of your document (a source of potential
+errors as you add/remove rows from your dataset).
+
+Here's an example: the answer to life, the universe, and everything is
+`r 6*7`.  (Look at the source code to see how this answer was derived.)
 
 ### Running code in an R session
 
@@ -127,8 +138,12 @@ You can give code chunks a name:
 x <- 2
 ```
 
-(This seems like useless trivia, but will become important in the
-discussion of caching below)
+This seems like useless trivia, but will become important in the
+discussion of caching below.  It also helps with navigating the
+document.  At the bottom left of the R Markdown editor is a menu
+(labeled "Top Level") which displays the code chunks in the document,
+along with their names if applicable.  That menu can be used to quickly
+jump to a code chunk.
 
 ### Caching
 
