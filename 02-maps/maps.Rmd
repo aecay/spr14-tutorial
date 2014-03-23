@@ -1,0 +1,104 @@
+```{r}
+opts_chunk$set(cache = TRUE)
+```
+
+# Mapping in R
+
+This document will walk you through creating several maps in R.  The components are:
+
+1. Creating a boundary shape for some Basque provinces
+2. An interactive map of Basque dative displacement
+   - geocoding the data
+   - mapping it
+3. Creating a topographic map
+
+## Creating boundary shapes
+
+The three traditional regions of the Northern Basque Country (Iparralde) do not correspond to present-day political boundaries (we have the French Revolution to thank for that).  This makes mapping of dialect data difficult, since the traditional region boundaries roughly correspond to dialect differences that continue to exist.  We can't get a shapefile that contains these boundaries.  But we can still map them, with a bit of effort.
+
+We'll use the [Global Administrative Areas](http://gadm.org/) database, which contains shapefiles corresponding to political boundaries for all the world's countries.  The French data is [here](http://biogeo.ucdavis.edu/data/gadm2/shp/FRA_adm.zip).  This is an ~11MB zip file containing several levels of detail.  We want the `FRA_adm5.*` files, containing the most detailed data (the boundaries of individual *comunes*, or towns).  The relevant files are also included in this git repository.
+
+We also need to install a couple of packages:
+
+```{r install.pkgs}
+install.packages(c("maptools","rgeos"))
+library(maptools)
+library(ggplot2)
+```
+
+Now we can read in the file.  Even though we only pass the `.shp` file to the `readShapeSpatial` function, the other files (`.dbf`, `.prj`, and `.shx`) will be consulted as well.
+
+```{r read.fra.shp}
+france.shapes <- readShapeSpatial("FRA_adm5.shp")
+```
+
+This gives a data structure similar to a `data.frame`.  The difference is that one of the columns contains not just a single number, string, or boolean, but rather the description of some geometric shape.  So, the conceptual structure looks like:
+
+Name   | ID | ...          | Shape                                           |
+------ | -- | ------------ | ----------------------------------------------- |
+Paris  | 01 | more columns | <instructions for drawing the outline of Paris> | 
+
+We can see what data is actually included in these files:
+```{r fra.head}
+head(france.shapes@data)
+```
+
+(The `@` is similar to the `$` operator for accessing data frame columns.  The exact difference is subtle; for our purpose it suffices to know that `france.shapes@data` picks out the data columns associated with the France shapes, and we could replace `data` with other things to get other aspects of the data, for example the drawing instructions.)
+
+
+Now we will pick out the `comunes` that belong to one of the historical provinces we are interested in; in this case Lapurdi:
+
+```{r lapurdi}
+lap.communes <- c("Ahetze", "Ainhoa", "Anglet", "Arbonne", "Arcangues",
+                  "Ascain", "Bardos", "Bassussarry", "Bayonne", "Biarritz",
+                  "Bidart", "Biriatou", "Bonloc", "Boucau", "Briscous",
+                  "Cambo-les-Bains", "Ciboure", "Espelette", "Gu\xe9thary",
+                  "Guiche", "Halsou", "Hasparren", "Hendaye", "Itxassou",
+                  "Jatxou", "Lahonce", "Larressore", "Louhossoa", "Macaye",
+                  "Mendionde", "Mouguerre", "Saint-Jean-de-Luz",
+                  "Saint-P\xe9e-sur-Nivelle", "Saint-Pierre-d'Irube",
+                  "Sare", "Soura\xefde", "Urcuit", "Urrugne", "Urt", "Ustaritz",
+                  "Villefranque")
+lap.polygons <- france.shapes[france.shapes@data$NAME_5 %in% lap.communes &
+                              as.integer(france.shapes@data$ID_5) != 28077,]
+```
+
+The first command just creates a list of `comunes` in Lapurdi (from the Municipalities in Labourd box at the bottom of the [Wikipedia page](https://en.wikipedia.org/wiki/Labourd).)  I had to make sure to spell the names the same way that they are spelled in the dataset (basically, using French rather than Basque names).  There are some funny codes in the strings; for example the French don't have a town named "Gu\xe9thary".  These are character escape codes.  The dataset from GADM uses [ISO Latin-1](https://en.wikipedia.org/wiki/ISO/IEC_8859-1) encoding, which is a way of numerically representing letters in computer memory.  Most computers today use Unicode.  The letter "é", for example, is represented by the number 233 in Latin-1, but as the two-number sequence (195, 169) in UTF-8 (which is the most common dialect of Unicode).  To avoid confusion, we enter the Latin-1 numeric representation directly into R.  "\xe9" is the number 233 in [hexadecimal, or base-16](https://en.wikipedia.org/wiki/Hexadecimal).
+
+Then, we take a subset of the rows in our data.  This looks complicated, but remember, subsetting a data frame in R is just `var[rows,cols]`.  We want all columns, so we leave the columns selector blank (the second line of the command ends with `,]`).  The rows we select are just the ones where the name of the `comune` (`france.shapes@data$NAME_5`) is in our list of Labourdin `comunes`.
+
+There's one additional complication: there is more than one "Villefranque" in France:
+
+```{r villefranque}
+france.shapes[france.shapes@data$NAME_5 == "Villefranque",]@data
+```
+
+So we use the ID number to de-select the wrong Villefranque (as determined by latitude/longitide).
+
+Here's what we have so far:
+
+```{r map.comunes}
+ggplot(fortify(lap.polygons), aes(x = long, y = lat, group = group)) + 
+  geom_polygon(fill = NA, color = "black") + 
+  coord_map()
+```
+
+We want to get rid of the interior lines, and only plot the outer boundaries of the region:
+
+```{r lap.union}
+lap.polygon <- unionSpatialPolygons(lap.polygons,
+                                    rep(1, length(lap.polygons)))
+```
+
+The second argument is just a list of 1s; it tells R to assign all the polygons in the input to the same output polygon.  And here we have it:
+
+```{r map.lapurdi}
+ggplot(fortify(lap.polygon), aes(x = long, y = lat, group = group)) + 
+  geom_polygon(fill = NA, color = "black") + 
+  coord_map()
+```
+
+We can compare the image to [Wikipedia](https://upload.wikimedia.org/wikipedia/commons/2/20/Labort-Pirineos_Atl%C3%A1nticos.svg), and see we've gotten it right.
+
+## Basque dative displacement
+
