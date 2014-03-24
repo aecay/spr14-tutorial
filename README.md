@@ -16,3 +16,4 @@ contribute information or correct errors.
 The lessons in this group so far are:
 
 1. Literate programming (Mar. 17, 2014)
+2. Maps in R (Mar. 24, 2014)
