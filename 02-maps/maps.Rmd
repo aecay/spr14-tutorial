@@ -1,10 +1,11 @@
-```{r}
+```{r echo=FALSE}
 opts_chunk$set(cache = TRUE)
 ```
 
 # Mapping in R
 
-This document will walk you through creating several maps in R.  The components are:
+This document will walk you through creating several maps in R.  The
+components are:
 
 1. Creating a boundary shape for some Basque provinces
 2. An interactive map of Basque dative displacement
@@ -14,14 +15,28 @@ This document will walk you through creating several maps in R.  The components 
 
 ## Creating boundary shapes
 
-The three traditional regions of the Northern Basque Country (Iparralde) do not correspond to present-day political boundaries (we have the French Revolution to thank for that).  This makes mapping of dialect data difficult, since the traditional region boundaries roughly correspond to dialect differences that continue to exist.  We can't get a shapefile that contains these boundaries.  But we can still map them, with a bit of effort.
+The three traditional regions of the Northern Basque Country (Iparralde)
+do not correspond to present-day political boundaries (we have the
+French Revolution to thank for that).  This makes mapping of dialect
+data difficult, since the traditional region boundaries roughly
+correspond to dialect differences that continue to exist.  We can't get
+a shapefile that contains these boundaries.  But we can still map them,
+with a bit of effort.
 
-We'll use the [Global Administrative Areas](http://gadm.org/) database, which contains shapefiles corresponding to political boundaries for all the world's countries.  The French data is [here](http://biogeo.ucdavis.edu/data/gadm2/shp/FRA_adm.zip).  This is an ~11MB zip file containing several levels of detail.  We want the `FRA_adm5.*` files, containing the most detailed data (the boundaries of individual *comunes*, or towns).  The relevant files are also included in this git repository.
+We'll use the [Global Administrative Areas](http://gadm.org/) database,
+which contains shapefiles corresponding to political boundaries for all
+the world's countries.  The French data is
+[here](http://biogeo.ucdavis.edu/data/gadm2/shp/FRA_adm.zip).  This is
+an ~11MB zip file containing several levels of detail.  We want the
+`FRA_adm5.*` files, containing the most detailed data (the boundaries of
+individual *comunes*, or towns).  The relevant files are also included
+in this git repository.
 
-We also need to install a few packages.  This incantation will install any that are missing on your computer:
+We also need to install a few packages.  This incantation will install
+any that are missing on your computer:
 
 ```{r install.pkgs}
-install.packages(setdiff(c("maptools","rgeos","ggmap","devtools","mapdata"), 
+install.packages(setdiff(c("maptools","rgeos","ggmap","devtools","mapdata"),
                          rownames(installed.packages())))
 library(maptools)
 library(ggplot2)
@@ -39,20 +54,28 @@ if (!"rMaps" %in% rownames(installed.packages())) {
 library(rMaps)
 ```
 
-Now we can read in the file.  Even though we only pass the `.shp` file to the `readShapeSpatial` function, the other files (`.dbf`, `.prj`, and `.shx`) will be consulted as well.
+Now we can read in the file.  Even though we only pass the `.shp` file
+to the `readShapeSpatial` function, the other files (`.dbf`, `.prj`, and
+`.shx`) will be consulted as well.
 
 ```{r read.fra.shp}
 france.shapes <- readShapeSpatial("FRA_adm5.shp")
 ```
 
-This gives a data structure similar to a `data.frame`.  The difference is that one of the columns contains not just a single number, string, or boolean, but rather the description of some geometric shape.  
+This gives a data structure similar to a `data.frame`.  The difference
+is that one of the columns contains not just a single number, string, or
+boolean, but rather the description of some geometric shape.
 
 We can see what data is actually included in these files (omitting the shapes, which are not very illuminating):
 ```{r fra.head}
 head(france.shapes@data, 3)
 ```
 
-(The `@` is similar to the `$` operator for accessing data frame columns.  The exact difference is subtle; for our purpose it suffices to know that `france.shapes@data` picks out the data columns associated with the France shapes, and we could replace `data` with other things to get other aspects of the data, for example the drawing instructions.)
+(The `@` is similar to the `$` operator for accessing data frame
+columns.  The exact difference is subtle; for our purpose it suffices to
+know that `france.shapes@data` picks out the data columns associated
+with the France shapes, and we could replace `data` with other things to
+get other aspects of the data, for example the drawing instructions.)
 
 
 Now we will pick out the `comunes` that belong to one of the historical provinces we are interested in; in this case Lapurdi:
@@ -72,46 +95,77 @@ lap.polygons <- france.shapes[france.shapes@data$NAME_5 %in% lap.communes &
                               as.integer(france.shapes@data$ID_5) != 28077,]
 ```
 
-The first command just creates a list of `comunes` in Lapurdi (from the Municipalities in Labourd box at the bottom of the [Wikipedia page](https://en.wikipedia.org/wiki/Labourd).)  I had to make sure to spell the names the same way that they are spelled in the dataset (basically, using French rather than Basque names).  There are some funny codes in the strings; for example the French don't have a town named "Gu\xe9thary".  These are character escape codes.  The dataset from GADM uses [ISO Latin-1](https://en.wikipedia.org/wiki/ISO/IEC_8859-1) encoding, which is a way of numerically representing letters in computer memory.  Most computers today use Unicode.  The letter "é", for example, is represented by the number 233 in Latin-1, but as the two-number sequence (195, 169) in UTF-8 (which is the most common dialect of Unicode).  To avoid confusion, we enter the Latin-1 numeric representation directly into R.  "\xe9" is the number 233 in [hexadecimal, or base-16](https://en.wikipedia.org/wiki/Hexadecimal).
+The first command just creates a list of `comunes` in Lapurdi (from the
+Municipalities in Labourd box at the bottom of the [Wikipedia
+page](https://en.wikipedia.org/wiki/Labourd).)  I had to make sure to
+spell the names the same way that they are spelled in the dataset
+(basically, using French rather than Basque names).  There are some
+funny codes in the strings; for example the French don't have a town
+named "Gu\xe9thary".  These are character escape codes.  The dataset
+from GADM uses [ISO
+Latin-1](https://en.wikipedia.org/wiki/ISO/IEC_8859-1) encoding, which
+is a way of numerically representing letters in computer memory.  Most
+computers today use Unicode.  The letter "é", for example, is
+represented by the number 233 in Latin-1, but as the two-number sequence
+(195, 169) in UTF-8 (which is the most common dialect of Unicode).  To
+avoid confusion, we enter the Latin-1 numeric representation directly
+into R.  "\xe9" is the number 233 in [hexadecimal, or
+base-16](https://en.wikipedia.org/wiki/Hexadecimal).
 
-Then, we take a subset of the rows in our data.  This looks complicated, but remember, subsetting a data frame in R is just `var[rows,cols]`.  We want all columns, so we leave the columns selector blank (the second line of the command ends with `,]`).  The rows we select are just the ones where the name of the `comune` (`france.shapes@data$NAME_5`) is in our list of Labourdin `comunes`.
+Then, we take a subset of the rows in our data.  This looks complicated,
+but remember, subsetting a data frame in R is just `var[rows,cols]`.  We
+want all columns, so we leave the columns selector blank (the second
+line of the command ends with `,]`).  The rows we select are just the
+ones where the name of the `comune` (`france.shapes@data$NAME_5`) is in
+our list of Labourdin `comunes`.
 
-There's one additional complication: there is more than one "Villefranque" in France:
+There's one additional complication: there is more than one
+"Villefranque" in France:
 
 ```{r villefranque}
 france.shapes[france.shapes@data$NAME_5 == "Villefranque",]@data
 ```
 
-So we use the ID number to de-select the wrong Villefranque (as determined by latitude/longitide).
+So we use the ID number to de-select the wrong Villefranque (as
+determined by latitude/longitide).
 
 Here's what we have so far:
 
 ```{r map.comunes}
-ggplot(fortify(lap.polygons), aes(x = long, y = lat, group = group)) + 
-  geom_polygon(fill = NA, color = "black") + 
+ggplot(fortify(lap.polygons), aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill = NA, color = "black") +
   coord_map()
 ```
 
-We want to get rid of the interior lines, and only plot the outer boundaries of the region:
+We want to get rid of the interior lines, and only plot the outer
+boundaries of the region:
 
 ```{r lap.union}
 lap.polygon <- unionSpatialPolygons(lap.polygons,
                                     rep(1, length(lap.polygons)))
 ```
 
-The second argument is just a list of 1s; it tells R to assign all the polygons in the input to the same output polygon.  And here we have it:
+The second argument is just a list of 1s; it tells R to assign all the
+polygons in the input to the same output polygon.  And here we have it:
 
 ```{r map.lapurdi}
-ggplot(fortify(lap.polygon), aes(x = long, y = lat, group = group)) + 
-  geom_polygon(fill = NA, color = "black") + 
+ggplot(fortify(lap.polygon), aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill = NA, color = "black") +
   coord_map()
 ```
 
-We can compare the image to [Wikipedia](https://upload.wikimedia.org/wikipedia/commons/2/20/Labort-Pirineos_Atl%C3%A1nticos.svg), and see we've gotten it right.
+We can compare the image to
+[Wikipedia](https://upload.wikimedia.org/wikipedia/commons/2/20/Labort-Pirineos_Atl%C3%A1nticos.svg),
+and see we've gotten it right.
 
 ## Basque dative displacement
 
-Dative displacement (DD) is a morphological operation in Basque.  For many details, consult [this article by Rezac & Fernández](http://www.umr7023.cnrs.fr/sites/sfl/IMG/pdf/DL3-2-2.pdf).  For our purposes, it suffices to know that it's an innovation that has been spreading from several loci over the past ~150 years.  We'll make a map of this data.
+Dative displacement (DD) is a morphological operation in Basque.  For
+many details, consult [this article by Rezac &
+Fernández](http://www.umr7023.cnrs.fr/sites/sfl/IMG/pdf/DL3-2-2.pdf).
+For our purposes, it suffices to know that it's an innovation that has
+been spreading from several loci over the past ~150 years.  We'll make a
+map of this data.
 
 Let's read that data:
 
@@ -120,7 +174,11 @@ dd <- read.csv("dd.csv", colClasses = c("character", "logical"))
 kable(head(dd))
 ```
 
-This is a very simple data frame, with just a town name and an indication of whether the local dialect has DD (summarized by me from the [MVAV atlas](http://euskaltzaindia.net/mvav)).  The first step is to geocode the data.  This is very simple thanks to the `ggmap` package (requires an internet connection and ~5 minutes):
+This is a very simple data frame, with just a town name and an
+indication of whether the local dialect has DD (summarized by me from
+the [MVAV atlas](http://euskaltzaindia.net/mvav)).  The first step is to
+geocode the data.  This is very simple thanks to the `ggmap` package
+(requires an internet connection and ~5 minutes):
 
 ```{r geocode.dd, eval=FALSE}
 library(ggmap)
@@ -129,20 +187,29 @@ dd.geo <- cbind(dd, geocoded)
 save(dd.geo, file = "dd-geo.Rdata")
 ```
 
-We don't actually evaluate the above code when running this document.  Instead we'll load the result I've saved, and look at places where the geocoding failed:
+We don't actually evaluate the above code when running this document.
+Instead we'll load the result I've saved, and look at places where the
+geocoding failed:
 
 ```{r read.dd.geo}
 load("dd-geo.Rdata")
 kable(subset(dd.geo, is.na(lon)))
 ```
 
-That's `r sum(is.na(dd.geo$lon))` failures in `r nrow(dd.geo)` rows.  Not bad.  There are also `r sum(dd.geo$lat > 43.46 | dd.geo$lat < 42.66, na.rm = T)` locations that got coded incorrectly.  This figure is more disappointing; probably we should have given more specific locations (by adding a province or country name to the town).  For now, we'll just filter them out:
+That's `r sum(is.na(dd.geo$lon))` failures in `r nrow(dd.geo)` rows.
+Not bad.  There are also `r sum(dd.geo$lat > 43.46 | dd.geo$lat < 42.66,
+na.rm = T)` locations that got coded incorrectly.  This figure is more
+disappointing; probably we should have given more specific locations (by
+adding a province or country name to the town).  For now, we'll just
+filter them out:
 
 ```{r fix.dd.geo}
 dd.geo <- subset(dd.geo, !is.na(lat) & dd.geo$lat < 43.46 & dd.geo$lat > 42.66)
 ```
 
-For semi-manual geocoding, a good source of place names with latitude and longitude information is [the US military](http://earth-info.nga.mil/gns/html/namefiles.htm).
+For semi-manual geocoding, a good source of place names with latitude
+and longitude information is [the US
+military](http://earth-info.nga.mil/gns/html/namefiles.htm).
 
 Now let's make an interactive map.
 
@@ -161,8 +228,8 @@ for (i in 1:nrow(dd.geo)) {
                 bindPopup = dd.geo[i,"name"])
 }
 
-map$legend(position = "topright", 
-           colors = c("#f00", "#00f"), 
+map$legend(position = "topright",
+           colors = c("#f00", "#00f"),
            labels = c("DD", "no DD"))
 
 map$print("dd.map", include_assets = TRUE)
@@ -170,9 +237,18 @@ map$print("dd.map", include_assets = TRUE)
 
 ## Topographic map
 
-Let's make a topographic map.  We'll use files from the US Geological Survey, which (nonetheless) cover the whole world.  We can download the files from [this FTP link](ftp://edcftp.cr.usgs.gov/data/gtopo30/global/).  The files are divided into pieces by latitude and longitude; [this handy file](ftp://edcftp.cr.usgs.gov/data/gtopo30/global/tiles.gif) shows which files correspond to which tiles.
+Let's make a topographic map.  We'll use files from the US Geological
+Survey, which (nonetheless) cover the whole world.  We can download the
+files from [this FTP
+link](ftp://edcftp.cr.usgs.gov/data/gtopo30/global/).  The files are
+divided into pieces by latitude and longitude; [this handy
+file](ftp://edcftp.cr.usgs.gov/data/gtopo30/global/tiles.gif) shows
+which files correspond to which tiles.
 
-We need to get the values out of their native grid format and into the expected (lat, long, measurement) format for ggplot.  Here's code to do this (we won't actually run it becuase it takes several minutes and lots of memory):
+We need to get the values out of their native grid format and into the
+expected (lat, long, measurement) format for ggplot.  Here's code to do
+this (we won't actually run it becuase it takes several minutes and lots
+of memory):
 
 ```{r topo.points, eval=FALSE}
 library(raster)
@@ -195,13 +271,16 @@ Now we can map:
 ```{r map.dd.topo}
 ggplot(aes(x = x, y = y), data = subset(topo.df,
                                         x > -2 & x < -1.25 &
-                                        y > 43 & y < 43.5)) + 
+                                        y > 43 & y < 43.5)) +
     geom_contour(aes(color = ..level.., z = W020N90), binwidth = 100) +
     coord_map(xlim = c(-2,-1.25), ylim = c(43,43.5)) +
-    scale_color_gradientn(colours = c("blue","green","red")) + 
+    scale_color_gradientn(colours = c("blue","green","red")) +
     geom_point(aes(x = lon, y = lat, shape = dd), data = dd.geo, size = 4) +
     theme_nothing(legend = TRUE) +
     geom_path(aes(x = long, y = lat, group = group), data = boundaries)
 ```
 
-`..level..` is a "magic" variable that sets the colors of the contour lines to the height calculated by ggplot.  The color palette used here is pretty awful from a perceptual standpoint.  We cannot use color to distinguish the points (as ggplot allows only one color per plot).
+`..level..` is a "magic" variable that sets the colors of the contour
+lines to the height calculated by ggplot.  The color palette used here
+is pretty awful from a perceptual standpoint.  We cannot use color to
+distinguish the points (as ggplot allows only one color per plot).
