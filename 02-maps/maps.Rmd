@@ -1,5 +1,5 @@
 ```{r echo=FALSE}
-opts_chunk$set(cache = TRUE)
+opts_chunk$set(cache = TRUE, tidy = FALSE)
 ```
 
 # Mapping in R
