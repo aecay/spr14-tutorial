@@ -36,13 +36,15 @@ We also need to install a few packages.  This incantation will install
 any that are missing on your computer:
 
 ```{r install.pkgs}
-install.packages(setdiff(c("maptools","rgeos","ggmap","devtools","mapdata"),
+install.packages(setdiff(c("maptools","rgeos","ggmap","devtools","mapdata",
+                           "xtable"),
                          rownames(installed.packages())))
 library(maptools)
 library(ggplot2)
 library(ggmap)
 library(devtools)
 library(mapdata)
+library(xtable)
 
 if (!"rCharts" %in% rownames(installed.packages())) {
     install_github("rCharts", "ramnathv")
@@ -53,6 +55,12 @@ if (!"rMaps" %in% rownames(installed.packages())) {
 }
 library(rMaps)
 ```
+
+```{r cache=FALSE}
+## Tell xtable we want html, not latex
+options(xtable.type="html", xtable.html.table.attributes="")
+```
+
 
 Now we can read in the file.  Even though we only pass the `.shp` file
 to the `readShapeSpatial` function, the other files (`.dbf`, `.prj`, and
@@ -191,17 +199,18 @@ We don't actually evaluate the above code when running this document.
 Instead we'll load the result I've saved, and look at places where the
 geocoding failed:
 
-```{r read.dd.geo}
+```{r read.dd.geo, results='asis'}
 load("dd-geo.Rdata")
-kable(subset(dd.geo, is.na(lon)))
+xtable(subset(dd.geo, is.na(lon)))
 ```
 
 That's `r sum(is.na(dd.geo$lon))` failures in `r nrow(dd.geo)` rows.
-Not bad.  There are also `r sum(dd.geo$lat > 43.46 | dd.geo$lat < 42.66,
-na.rm = T)` locations that got coded incorrectly.  This figure is more
+Not bad.  There are also `r sum(dd.geo$lat > 43.46 | dd.geo$lat < 42.66, na.rm = T)`
+locations that got coded incorrectly.  This figure is more
 disappointing; probably we should have given more specific locations (by
 adding a province or country name to the town).  For now, we'll just
-filter them out:
+filter them out by restricting the data to the latitude and longitude we are
+interested in:
 
 ```{r fix.dd.geo}
 dd.geo <- subset(dd.geo, !is.na(lat) & dd.geo$lat < 43.46 & dd.geo$lat > 42.66)
@@ -237,7 +246,7 @@ map$print("dd.map", include_assets = TRUE)
 
 ## Topographic map
 
-Let's make a topographic map.  We'll use files from the US Geological
+Let's make a topographic map of this data.  We'll use files from the US Geological
 Survey, which (nonetheless) cover the whole world.  We can download the
 files from [this FTP
 link](ftp://edcftp.cr.usgs.gov/data/gtopo30/global/).  The files are
@@ -281,6 +290,8 @@ ggplot(aes(x = x, y = y), data = subset(topo.df,
 ```
 
 `..level..` is a "magic" variable that sets the colors of the contour
-lines to the height calculated by ggplot.  The color palette used here
-is pretty awful from a perceptual standpoint.  We cannot use color to
-distinguish the points (as ggplot allows only one color per plot).
+lines to the height calculated by ggplot.  **CAVEAT**: the color palette
+used here is pretty awful from a perceptual standpoint; if you were
+serious about this map you'd want to look for a better one.  We cannot
+use color to distinguish the points (as ggplot allows only one color per
+plot).
