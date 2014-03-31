@@ -37,7 +37,7 @@ any that are missing on your computer:
 
 ```{r install.pkgs}
 install.packages(setdiff(c("maptools","rgeos","ggmap","devtools","mapdata",
-                           "xtable"),
+                           "xtable","rgdal"),
                          rownames(installed.packages())))
 library(maptools)
 library(ggplot2)
